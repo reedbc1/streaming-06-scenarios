@@ -56,6 +56,7 @@ from streaming.data_validation.data_contract_case import (
     SALES_REQUIRED_FIELDS,
     validate_required_fields,
 )
+from streaming.notifications_reed import send_sales_threshold_email
 from streaming.storage.storage_case import init_db, write_valid_record
 from streaming.visualizations.live_visualizations_case import (
     close_live_chart,
@@ -78,6 +79,8 @@ log_env_vars(LOG)
 COURSE_NAME: Final[str] = "Streaming Data"
 TIMEOUT_SECONDS: Final[float] = float(os.getenv("CONSUMER_TIMEOUT_SECONDS", "10.0"))
 MAX_MESSAGES: Final[int] = int(os.getenv("CONSUMER_MAX_MESSAGES", "1000"))
+SALES_ALERT_THRESHOLD: Final[float] = float(os.getenv("SALES_ALERT_THRESHOLD", "500"))
+SALES_ALERT_EMAIL: Final[str] = os.getenv("SALES_ALERT_EMAIL", "").strip()
 
 # === DECLARE CONSTANT PATHS ===
 
@@ -130,6 +133,8 @@ def load_settings() -> KafkaSettings:
     LOG.info(f"KAFKA_GROUP_ID           = {settings.group_id}")
     LOG.info(f"CONSUMER_TIMEOUT_SECONDS = {TIMEOUT_SECONDS}")
     LOG.info(f"CONSUMER_MAX_MESSAGES    = {MAX_MESSAGES}")
+    LOG.info(f"SALES_ALERT_THRESHOLD    = ${SALES_ALERT_THRESHOLD:,.2f}")
+    LOG.info(f"SALES_ALERT_EMAIL        = {SALES_ALERT_EMAIL or '(not configured)'}")
     return settings
 
 
@@ -245,6 +250,38 @@ def load_reference_data() -> dict[str, float]:
     return region_lookup
 
 
+def send_sales_alert_if_needed(*, alert_sent: bool, total_sales: float) -> bool:
+    """Send one threshold alert after total sales exceed the configured amount.
+
+    Args:
+        alert_sent: Whether the alert has already been handled in this run.
+        total_sales: Current running total sales.
+
+    Returns:
+        True after the alert has been handled, otherwise False.
+    """
+    if alert_sent or total_sales <= SALES_ALERT_THRESHOLD:
+        return alert_sent
+
+    if not SALES_ALERT_EMAIL:
+        LOG.warning("Sales alert threshold exceeded, but SALES_ALERT_EMAIL is not set.")
+        LOG.warning("No notification email was sent.")
+        return True
+
+    try:
+        result = send_sales_threshold_email(
+            recipient_email=SALES_ALERT_EMAIL,
+            threshold=SALES_ALERT_THRESHOLD,
+            total_sales=total_sales,
+        )
+        LOG.info("Sales threshold notification email sent.")
+        LOG.info(f"gmail_message_id={result.get('id', '')}")
+    except Exception as error:
+        LOG.error(f"Failed to send sales threshold notification: {error}")
+
+    return True
+
+
 def process_message(
     row: dict[str, Any],
     *,
@@ -338,6 +375,7 @@ def consume_messages(
 
     consumed_count = 0
     skipped_count = 0
+    alert_sent = False
 
     while consumed_count + skipped_count < MAX_MESSAGES:
         row = consume_kafka_message(
@@ -391,6 +429,10 @@ def consume_messages(
         LOG.info(f"average=${stats.mean:,.2f}")
         LOG.info(f"min=${stats.minimum:,.2f}")
         LOG.info(f"max=${stats.maximum:,.2f}")
+        alert_sent = send_sales_alert_if_needed(
+            alert_sent=alert_sent,
+            total_sales=stats.total,
+        )
 
     return consumed_count, skipped_count
 
