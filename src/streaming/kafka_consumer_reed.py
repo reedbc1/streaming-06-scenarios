@@ -278,6 +278,7 @@ def send_sales_alert_if_needed(*, alert_sent: bool, total_sales: float) -> bool:
         LOG.info(f"gmail_message_id={result.get('id', '')}")
     except Exception as error:
         LOG.error(f"Failed to send sales threshold notification: {error}")
+        raise
 
     return True
 

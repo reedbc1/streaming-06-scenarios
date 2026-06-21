@@ -105,4 +105,7 @@ def send_sales_threshold_email(
 
 
 if __name__ == "__main__":
-    print("Import send_sales_threshold_email() from kafka_consumer_reed.py.")
+    get_gmail_credentials()
+    send_sales_threshold_email(
+        recipient_email="reedbc1@gmail.com", threshold=500, total_sales=1000
+    )
