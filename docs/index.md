@@ -54,7 +54,7 @@ each accepted order, the order total, the running total sales, average sale,
 minimum sale, and maximum sale.
 
 Valid consumed records are written to `data/output/consumed_sales.csv` and
-`data/output/sales.duckdb`. The consumed CSV keeps the main transaction fields
+`data/output/sales.duckdb`. The output CSV keeps the main transaction fields
 plus the derived fields and Kafka metadata: `_kafka_key`, `_kafka_partition`,
 and `_kafka_offset`.
 
