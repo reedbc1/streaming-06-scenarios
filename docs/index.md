@@ -82,6 +82,9 @@ The running sales total exceeded the `$500` threshold during the stream, so the
 consumer triggered the notification email logic. This turned the stream from a
 passive logging example into a small automated alerting workflow.
 
+**Resulting email:**
+![Result email](result_email.png)
+
 ### Interpretation
 
 The Kafka workflow showed how a static CSV can be treated as a stream of
